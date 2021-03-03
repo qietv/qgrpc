@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "proto";
+
+message TestReq {
+    string ping = 1;
+}
+
+message TestResp {
+    string pong = 1;
+}
+service Test {
+    rpc test(TestReq) returns (TestResp);
+}

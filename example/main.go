@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"example/proto"
 	"fmt"
 	"github.com/qietv/qgrpc"
 	"google.golang.org/grpc"
@@ -9,31 +10,41 @@ import (
 
 type demoServer struct{}
 
+func (ds *demoServer) Test(c context.Context, req *proto.TestReq) (resp *proto.TestResp, err error) {
+	resp = &proto.TestResp{
+		Pong: "pong",
+	}
+	return
+}
+
 func main() {
-	s, err := qgrpc.New(&qgrpc.Config{
+	var (
+		err error
+		s  *qgrpc.Server
+	)
+	s, err = qgrpc.New(&qgrpc.Config{
 		Name:        "demo",
 		Network:     "tcp",
 		Addr:        ":8809",
 		AccessLog:   "access.log",
 		ErrorLog:    "error.log",
 		Interceptor: nil,
-	}, func(s *grpc.Server) {
-		demo.RegisterGRPCDemoServer(s, &demoServer{})
+	}, func(s *qgrpc.Server) {
+		proto.RegisterTestServer(s.Server, &demoServer{})
 	})
 	if err != nil {
 		panic(fmt.Sprintf("grpc server start fail, %s", err.Error()))
 	}
 	defer s.Server.GracefulStop()
 
-	//Test server
+
 	conn, err := grpc.Dial("localhost:8809", grpc.WithInsecure())
 	if err != nil {
 		panic(err.Error())
 	}
-
-	gRPCClient := demoServer.NewGRPCDemoClient(conn)
-	ret, err := gRPCClient.GetList(context.Background(), &demo.ListReq{
-		Start: 0,
-		Limit: 10,
+	client := proto.NewTestClient(conn)
+	resp, err := client.Test(context.Background(), &proto.TestReq{
+		Ping:                 "aaa",
 	})
+	println(resp.Pong)
 }

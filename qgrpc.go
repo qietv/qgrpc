@@ -54,7 +54,7 @@ func (s *Server) Watch(req *health.HealthCheckRequest, hW health.Health_WatchSer
 	return nil
 }
 
-func Default(registerFunc func(s *grpc.Server)) (s *Server, err error) {
+func Default(registerFunc func(s *Server)) (s *Server, err error) {
 	return New(&Config{
 		Name:              "qgrpc",
 		Network:           "tcp",
@@ -73,7 +73,7 @@ func Default(registerFunc func(s *grpc.Server)) (s *Server, err error) {
 
 // NewServer creates a gRPC server for qietv's mico service Server
 // err when listen fail
-func New(c *Config, registerFunc func(s *grpc.Server)) (s *Server, err error) {
+func New(c *Config, registerFunc func(s *Server)) (s *Server, err error) {
 	var (
 		listener net.Listener
 	)
@@ -95,7 +95,7 @@ func New(c *Config, registerFunc func(s *grpc.Server)) (s *Server, err error) {
 		err = fmt.Errorf("create server fail, %s", err.Error())
 		return
 	}
-	registerFunc(s.Server)
+	registerFunc(s)
 	health.RegisterHealthServer(s.Server, s)
 	go func() {
 		err = s.Serve(listener)

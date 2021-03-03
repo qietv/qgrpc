@@ -1,4 +1,4 @@
 .idea/
 go.sum
 .DS_Store
-example/go.mod
+go.mod
