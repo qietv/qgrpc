@@ -12,11 +12,12 @@ import (
 	"time"
 )
 
-//gRPC Server config for qietv
+//Config gRPC Server config for qietv
 type Config struct {
 	Name              string                   `yaml:"name,omitempty"`
 	Network           string                   `yaml:"network,omitempty"`
 	Addr              string                   `yaml:"addr,omitempty"`
+	Listen            string                   `yaml:"listen,omitempty"`
 	Timeout           pkg.Duration             `yaml:"timeout,omitempty"`
 	IdleTimeout       pkg.Duration             `yaml:"idleTimeout,omitempty"`
 	MaxLifeTime       pkg.Duration             `yaml:"maxLifeTime,omitempty"`
@@ -54,9 +55,9 @@ func (s *Server) Watch(req *health.HealthCheckRequest, hW health.Health_WatchSer
 	return nil
 }
 
-func Default(registerFunc func(s *Server)) (s *Server, err error) {
+func Default(registerFunc func(s *grpc.Server)) (s *Server, err error) {
 	return New(&Config{
-		Name:              "qgrpc",
+		Name:              "qietv",
 		Network:           "tcp",
 		Addr:              ":8808",
 		Timeout:           pkg.Duration(time.Second * 20),
@@ -71,9 +72,9 @@ func Default(registerFunc func(s *Server)) (s *Server, err error) {
 	}, registerFunc)
 }
 
-// NewServer creates a gRPC server for qietv's mico service Server
+// New  creates a gRPC server for Qietv's mico service Server
 // err when listen fail
-func New(c *Config, registerFunc func(s *Server)) (s *Server, err error) {
+func New(c *Config, registerFunc func(s *grpc.Server)) (s *Server, err error) {
 	var (
 		listener net.Listener
 	)
@@ -89,13 +90,17 @@ func New(c *Config, registerFunc func(s *Server)) (s *Server, err error) {
 			}),
 			initInterceptor(c.Name, c.AccessLog, c.ErrorLog, c.Interceptor),
 		),
+		conf: c,
+	}
+	if c.Addr == "" {
+		c.Addr = c.Listen
 	}
 	listener, err = net.Listen(c.Network, c.Addr)
 	if err != nil {
 		err = fmt.Errorf("create server fail, %s", err.Error())
 		return
 	}
-	registerFunc(s)
+	registerFunc(s.Server)
 	health.RegisterHealthServer(s.Server, s)
 	go func() {
 		err = s.Serve(listener)
@@ -123,22 +128,34 @@ func initInterceptor(serviceName, access, error string, interceptors []map[strin
 		switch name {
 		case "trace":
 			var (
-				service interface{}
-				tracer  interface{}
+				service string
+				tracer  string
 				ok      bool
 			)
-			if service, ok = interceptor["service"]; !ok {
-				if serviceName == "" {
-					println("qgRPC trace conf fail, %+v", interceptor)
-					continue
-				}
+			if service, ok = interceptor["service"].(string); !ok {
 				service = serviceName
 			}
-			if tracer, ok = interceptor["tracer"]; !ok {
-				println("qgRPC trace conf fail, %+v", interceptor)
-				continue
+			if tracer, ok = interceptor["agent"].(string); !ok {
+				tracer = ""
 			}
-			chain = append(chain, NewTracerInterceptor(service.(string), tracer.(string)))
+			chain = append(chain, NewTracerInterceptor(service, tracer))
+		case "metric":
+			var (
+				histogram    bool
+				histogramVal interface{}
+			)
+			histogramVal = interceptor["histogram"]
+			switch histogramVal.(type) {
+			case string:
+				if "true" == histogramVal.(string) {
+					histogram = true
+				}
+			case nil:
+				histogram = false
+			case bool:
+				histogram = histogramVal.(bool)
+			}
+			chain = append(chain, NewMetricInterceptor(serviceName, histogram))
 		default:
 			println("qgRPC interceptor not support, %+v", interceptor)
 		}

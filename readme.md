@@ -27,4 +27,6 @@
 
 #### 里程碑
 - [x] 健康检查
+- [x] metrics
+- [x] discovery
 - [x] access && error log
