@@ -19,12 +19,21 @@ import (
 
 var (
 	QTracer opentracing.Tracer
+	Metrics *QGrpcMetrics
 )
 
 // NewLoggingInterceptor create log interceptor
 // format {time}\t{origin}\t{method}\t{http code}\t{status.code}\t{status.message}
 func NewLoggingInterceptor(logfile string) grpc.UnaryServerInterceptor {
-	accessLogger, err := logkit.NewFileLogger(logfile, "", time.Second, uint64(1204*1024*1800), 0)
+	var (
+		accessLogger io.Writer
+		err          error
+	)
+	if logfile == "/dev/stdout" {
+		accessLogger = os.Stdout
+	} else {
+		accessLogger, err = logkit.NewFileLogger(logfile, "", time.Second, uint64(1204*1024*1800), 0)
+	}
 	if err != nil {
 		println("logger conf fail, %s", err.Error())
 	}
@@ -77,7 +86,7 @@ func NewLoggingInterceptor(logfile string) grpc.UnaryServerInterceptor {
 }
 
 // NewRecoveryInterceptor grpc server ServerInterceptor
-// create union recovery handler for gRPC service
+// create union revovery handler for qietv gRPC sevice
 func NewRecoveryInterceptor(logfile string) grpc.UnaryServerInterceptor {
 	var (
 		errorLogger io.Writer
@@ -89,19 +98,22 @@ func NewRecoveryInterceptor(logfile string) grpc.UnaryServerInterceptor {
 	if logfile != "" {
 		errorLogger, err = logkit.NewFileLogger(logfile, "", time.Second, uint64(1204*1024*1800), 0)
 	} else {
-		errorLogger, err = os.Open("/dev/stderr")
+		errorLogger = os.Stderr
 	}
 	if err != nil {
-		println("logger conf fail, %s", err.Error())
+		println(fmt.Sprintf("logger conf fail, %s", err.Error()))
 	}
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 
 		defer func() {
 			if r := recover(); r != nil {
 				if _, err := errorLogger.Write([]byte(fmt.Sprintf("%s\t%s\t%s\n fatal ===> %s %s \n===============\n", startTime.Format(time.RFC3339), remoteIp, info.FullMethod, r, debug.Stack()))); err != nil {
-					println("write access log fail, %s", err.Error())
+					println(fmt.Sprintf("write access log fail, %s", err.Error()))
 				}
 				err = status.Errorf(codes.Internal, "fatal err: %+v", r)
+				if Metrics != nil {
+					Metrics.AddPanicNumber(info)
+				}
 			}
 		}()
 		return handler(ctx, req)
@@ -125,4 +137,9 @@ func NewTracerInterceptor(serviceName string, agentHost string) grpc.UnaryServer
 	}
 	opentracing.SetGlobalTracer(QTracer)
 	return serverInterceptor(QTracer, true)
+}
+
+func NewMetricInterceptor(serviceName string, histogram bool) grpc.UnaryServerInterceptor {
+	Metrics = NewMetrics(serviceName, histogram)
+	return Metrics.ServerInterceptor()
 }

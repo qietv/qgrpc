@@ -3,7 +3,6 @@ package qgrpc
 import (
 	"context"
 	"encoding/base64"
-	"github.com/hanskorg/logkit"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/opentracing/opentracing-go/log"
@@ -169,10 +168,9 @@ func serverInterceptor(tracer opentracing.Tracer, withError bool) grpc.UnaryServ
 		if !ok {
 			md = metadata.New(nil)
 		}
-		parentSpanContext, err := tracer.Extract(opentracing.HTTPHeaders, MDReaderWriter{md})
-		if err != nil && err != opentracing.ErrSpanContextNotFound {
+		parentSpanContext, e := tracer.Extract(opentracing.HTTPHeaders, MDReaderWriter{md})
+		if e != nil && e != opentracing.ErrSpanContextNotFound {
 			opentracing.SpanFromContext(ctx)
-			logkit.Errorf("extract from metadata err: %v", err)
 		}
 		span = tracer.StartSpan(
 			info.FullMethod,
