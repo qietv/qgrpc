@@ -3,21 +3,23 @@ package qgrpc
 import (
 	"context"
 	"fmt"
+	"net"
+	"sync"
+	"time"
+
 	"github.com/qietv/qgrpc/pkg"
 	"google.golang.org/grpc"
 	health "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/keepalive"
-	"net"
-	"sync"
-	"time"
 )
 
-//Config gRPC Server config for qietv
+// Config gRPC Server config for qietv
 type Config struct {
 	Name              string                   `yaml:"name,omitempty"`
 	Network           string                   `yaml:"network,omitempty"`
 	Addr              string                   `yaml:"addr,omitempty"`
 	Listen            string                   `yaml:"listen,omitempty"`
+	HealthCheck       bool                     `yaml:"health,omitempty"`
 	Timeout           pkg.Duration             `yaml:"timeout,omitempty"`
 	IdleTimeout       pkg.Duration             `yaml:"idleTimeout,omitempty"`
 	MaxLifeTime       pkg.Duration             `yaml:"maxLifeTime,omitempty"`
@@ -29,7 +31,7 @@ type Config struct {
 	Interceptor       []map[string]interface{} `yaml:"interceptors,omitempty"`
 }
 
-//Server gRPC server for qietv mico-service server
+// Server gRPC server for qietv mico-service server
 type Server struct {
 	conf *Config
 	mu   sync.Mutex
@@ -101,7 +103,9 @@ func New(c *Config, registerFunc func(s *grpc.Server)) (s *Server, err error) {
 		return
 	}
 	registerFunc(s.Server)
-	health.RegisterHealthServer(s.Server, s)
+	if c.HealthCheck {
+		health.RegisterHealthServer(s.Server, s)
+	}
 	go func() {
 		err = s.Serve(listener)
 		if err != nil {
