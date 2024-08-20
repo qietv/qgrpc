@@ -33,7 +33,7 @@ func NewLoggingInterceptor(logfile string) grpc.UnaryServerInterceptor {
 	if strings.ToLower(logfile) == "/dev/stdout" {
 		accessLogger = os.Stdout
 	} else {
-		accessLogger, err = logkit.NewFileLogger(logfile, "", time.Second, uint64(1204*1024*1800), 0)
+		accessLogger, err = logkit.NewFileLogger(logfile, time.Second, 1204*1024*100, 1024*4)
 	}
 	if err != nil {
 		println("logger conf fail, %s", err.Error())
@@ -97,7 +97,7 @@ func NewRecoveryInterceptor(logfile string) grpc.UnaryServerInterceptor {
 	)
 
 	if logfile != "" && logfile != "/dev/stderr" {
-		errorLogger, err = logkit.NewFileLogger(logfile, "", time.Second, uint64(1204*1024*1800), 0)
+		errorLogger, err = logkit.NewFileLogger(logfile, time.Second, 1204*1024*100, 1024*4)
 	} else {
 		errorLogger = os.Stderr
 	}

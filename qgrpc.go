@@ -74,21 +74,21 @@ func Default(registerFunc func(s *grpc.Server)) (s *Server, err error) {
 
 // New  creates a gRPC server for Qietv's mico service Server
 // err when listen fail
-func New(c *Config, registerFunc func(s *grpc.Server), opts ...grpc.Option) (s *Server, err error) {
+func New(c *Config, registerFunc func(s *grpc.Server), opts ...grpc.ServerOption) (s *Server, err error) {
 	var (
 		listener net.Listener
 	)
-
+	opts = append(opts, grpc.KeepaliveParams(keepalive.ServerParameters{
+		MaxConnectionIdle: time.Duration(c.IdleTimeout),
+		//MaxConnectionAgeGrace: time.Duration(c.ForceCloseWait),
+		Time:             time.Duration(c.KeepAliveInterval),
+		Timeout:          time.Duration(c.Timeout),
+		MaxConnectionAge: time.Duration(c.MaxLifeTime),
+	}),
+		initInterceptor(c.Name, c.AccessLog, c.ErrorLog, c.Interceptor),
+	)
 	s = &Server{
 		Server: grpc.NewServer(
-			grpc.KeepaliveParams(keepalive.ServerParameters{
-				MaxConnectionIdle: time.Duration(c.IdleTimeout),
-				//MaxConnectionAgeGrace: time.Duration(c.ForceCloseWait),
-				Time:             time.Duration(c.KeepAliveInterval),
-				Timeout:          time.Duration(c.Timeout),
-				MaxConnectionAge: time.Duration(c.MaxLifeTime),
-			}),
-			initInterceptor(c.Name, c.AccessLog, c.ErrorLog, c.Interceptor),
 			opts...,
 		),
 		conf: c,
