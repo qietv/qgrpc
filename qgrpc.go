@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-//Config gRPC Server config for qietv
+// Config gRPC Server config for qietv
 type Config struct {
 	Name              string                   `yaml:"name,omitempty"`
 	Network           string                   `yaml:"network,omitempty"`
@@ -29,7 +29,7 @@ type Config struct {
 	Interceptor       []map[string]interface{} `yaml:"interceptors,omitempty"`
 }
 
-//Server gRPC server for qietv mico-service server
+// Server gRPC server for qietv mico-service server
 type Server struct {
 	conf *Config
 	mu   sync.Mutex
@@ -74,7 +74,7 @@ func Default(registerFunc func(s *grpc.Server)) (s *Server, err error) {
 
 // New  creates a gRPC server for Qietv's mico service Server
 // err when listen fail
-func New(c *Config, registerFunc func(s *grpc.Server)) (s *Server, err error) {
+func New(c *Config, registerFunc func(s *grpc.Server), opts ...grpc.Option) (s *Server, err error) {
 	var (
 		listener net.Listener
 	)
@@ -89,6 +89,7 @@ func New(c *Config, registerFunc func(s *grpc.Server)) (s *Server, err error) {
 				MaxConnectionAge: time.Duration(c.MaxLifeTime),
 			}),
 			initInterceptor(c.Name, c.AccessLog, c.ErrorLog, c.Interceptor),
+			opts...,
 		),
 		conf: c,
 	}
