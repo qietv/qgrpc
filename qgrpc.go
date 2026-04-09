@@ -4,13 +4,15 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"sync"
 	"time"
 
 	"github.com/qietv/qgrpc/pkg"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	grpcHealth "google.golang.org/grpc/health"
 	health "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/status"
 )
 
 // Config gRPC Server config for qietv
@@ -34,27 +36,30 @@ type Config struct {
 // Server gRPC server for qietv mico-service server
 type Server struct {
 	conf *Config
-	mu   sync.Mutex
 	*grpc.Server
-	listener net.TCPListener
+	listener  net.TCPListener
+	healthSrv *grpcHealth.Server
 }
 
 func (s *Server) Check(ctx context.Context, in *health.HealthCheckRequest) (*health.HealthCheckResponse, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if in.Service == s.conf.Name {
-		// check the server overall health status.
-		return &health.HealthCheckResponse{
-			Status: health.HealthCheckResponse_SERVING,
-		}, nil
+	if s.healthSrv == nil {
+		return nil, status.Error(codes.Unimplemented, "health check service is not enabled")
 	}
-	return &health.HealthCheckResponse{
-		Status: health.HealthCheckResponse_UNKNOWN,
-	}, nil
+	return s.healthSrv.Check(ctx, in)
 }
 
 func (s *Server) Watch(req *health.HealthCheckRequest, hW health.Health_WatchServer) error {
-	return nil
+	if s.healthSrv == nil {
+		return status.Error(codes.Unimplemented, "health check service is not enabled")
+	}
+	return s.healthSrv.Watch(req, hW)
+}
+
+func (s *Server) List(ctx context.Context, req *health.HealthListRequest) (*health.HealthListResponse, error) {
+	if s.healthSrv == nil {
+		return nil, status.Error(codes.Unimplemented, "health check service is not enabled")
+	}
+	return s.healthSrv.List(ctx, req)
 }
 
 func Default(registerFunc func(s *grpc.Server)) (s *Server, err error) {
@@ -104,6 +109,10 @@ func New(c *Config, registerFunc func(s *grpc.Server)) (s *Server, err error) {
 	}
 	registerFunc(s.Server)
 	if c.HealthCheck {
+		s.healthSrv = grpcHealth.NewServer()
+		if c.Name != "" {
+			s.healthSrv.SetServingStatus(c.Name, health.HealthCheckResponse_SERVING)
+		}
 		health.RegisterHealthServer(s.Server, s)
 	}
 	go func() {
