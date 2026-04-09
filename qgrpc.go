@@ -84,11 +84,11 @@ func New(c *Config, registerFunc func(s *grpc.Server)) (s *Server, err error) {
 	s = &Server{
 		Server: grpc.NewServer(
 			grpc.KeepaliveParams(keepalive.ServerParameters{
-				MaxConnectionIdle: time.Duration(c.IdleTimeout),
-				//MaxConnectionAgeGrace: time.Duration(c.ForceCloseWait),
-				Time:             time.Duration(c.KeepAliveInterval),
-				Timeout:          time.Duration(c.Timeout),
-				MaxConnectionAge: time.Duration(c.MaxLifeTime),
+				MaxConnectionIdle:     time.Duration(c.IdleTimeout),
+				MaxConnectionAgeGrace: time.Duration(c.ForceCloseWait),
+				Time:                  time.Duration(c.KeepAliveInterval),
+				Timeout:               time.Duration(c.Timeout),
+				MaxConnectionAge:      time.Duration(c.MaxLifeTime),
 			}),
 			initInterceptor(c.Name, c.AccessLog, c.ErrorLog, c.Interceptor),
 		),
